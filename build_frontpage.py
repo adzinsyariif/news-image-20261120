@@ -1,178 +1,187 @@
 #!/usr/bin/env python3
-"""Compose the 20 November 2026 front page.
-
-One broadsheet page, top to bottom: the nameplate, a black dateline
-strip, the market-crash artwork, a crimson headline band carrying the
-day's lead story, and a dark 4-by-2 grid of the other stories. All
-lettering is drawn with PIL so it stays sharp; the plunging-chart
-scene is the only generated art.
-
-The lead is the global sell-off: Wall Street fell for a fifth straight
-session on Thursday and Tokyo's Nikkei dropped 4.8% on Friday as the
-AI trade shuddered a day after Anthropic's record debut. Around it:
-the Shenzhen summit's symbolism-rich, breakthrough-free aftermath,
-overnight strikes on Kyiv's bridges, Russian objects in Polish
-airspace, another Houthi barrage intercepted over Riyadh, Italy's
-EUR 805 million fine on Meta, the FAA ground stop, President Prabowo's
-return with nearly Rp1,600 trillion in investment pledges, and Kenya
-discharging its last Ebola patient.
 """
+One Day - 20 November 2026: compose the front page.
+
+The page is a single 1024x1024 broadsheet. From the top: a serif
+nameplate, a dateline strip, the day's artwork (a red chart diving
+across a wall of trading screens while two skylines watch), a crimson
+band with the lead headline, a grid of eight further stories, and a
+black ticker along the foot with four more. Every letter is rendered
+here with PIL; the artwork is the only picture element.
+
+Lead story: the sell-off. US shares closed lower for a fifth session
+running on Thursday and Tokyo's Nikkei shed 4.8% on Friday, as the AI
+trade wobbled a day after Anthropic's record-breaking market debut.
+"""
+
 import os
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-MARKET_ART = (
-    "/home/hatch/workspace/makefun/news-art-20/"
-    "media-generation-news-hero-markets-20-0-8546d180-0fe0-4d7f-b145-999ff4a1a710.webp"
+BASE = os.path.dirname(os.path.abspath(__file__))
+ARTWORK = os.path.join(
+    "/home/hatch/workspace/makefun/news-art-20",
+    "media-generation-news-hero-markets-20-0-8546d180-0fe0-4d7f-b145-999ff4a1a710.webp",
 )
-OUT_PATH = os.path.join(HERE, "entry.png")
-SIZE_CAP = 1_048_576
+TARGET = os.path.join(BASE, "entry.png")
+BYTE_LIMIT = 1024 * 1024
 
-FONTS = "/usr/share/fonts/truetype/liberation"
-SERIF_BOLD = os.path.join(FONTS, "LiberationSerif-Bold.ttf")
-SANS_BOLD = os.path.join(FONTS, "LiberationSans-Bold.ttf")
-SANS = os.path.join(FONTS, "LiberationSans-Regular.ttf")
+FONT_DIR = "/usr/share/fonts/truetype/liberation"
+SERIF = os.path.join(FONT_DIR, "LiberationSerif-Bold.ttf")
+SANS = os.path.join(FONT_DIR, "LiberationSans-Regular.ttf")
+SANS_B = os.path.join(FONT_DIR, "LiberationSans-Bold.ttf")
 
-SIDE = 1024
-PAPER = (246, 241, 233)
-INK = (16, 16, 16)
-GRID_BG = (15, 18, 23)
-BAND = (146, 20, 20)
-BAND_SUB = (255, 224, 166)
-PAPER_WHITE = (255, 255, 255)
-BODY_GREY = (203, 209, 217)
-DIVIDER = (62, 68, 76)
+W = 1024
+CREAM = (247, 242, 234)
+BLACK = (18, 18, 18)
+CRIMSON = (148, 22, 22)
+GOLD = (255, 225, 170)
+WHITE = (255, 255, 255)
+GRID = (14, 17, 22)
+MIST = (200, 206, 214)
+RULE = (60, 66, 74)
 
-HEADLINE = "MARKETS PLUNGE AS AI SELL-OFF DEEPENS"
-SUBHEAD = "WALL ST FALLS A FIFTH DAY - NIKKEI OFF 4.8%"
+LEAD = "MARKETS PLUNGE AS AI SELL-OFF DEEPENS"
+LEAD_SUB = "WALL ST FALLS A FIFTH DAY - NIKKEI OFF 4.8%"
+DATELINE = "FRIDAY  \u2022  20 NOVEMBER 2026  \u2022  WORLD NEWS IN ONE IMAGE"
 
-# (headline, one-line summary, accent bar colour), in reading order.
-PANELS = [
+# Eight stories under the fold: (title, standfirst, tab colour).
+STORIES = [
     ("SUMMIT OF SYMBOLS",
      "Trump, Xi, Putin: big symbolism, no breakthrough",
-     (255, 196, 110)),
+     (255, 199, 110)),
     ("KYIV BRIDGES STRUCK",
      "8 killed as missiles target the capital overnight",
-     (255, 96, 96)),
+     (255, 97, 97)),
     ("NATO AIRSPACE BREACHED",
-     "Poland: 2 Russian missiles and a drone crossed in",
-     (196, 164, 255)),
+     "Warsaw: 2 missiles and a drone crossed overnight",
+     (199, 166, 255)),
     ("RIYADH INTERCEPTS AGAIN",
      "Saudi defences down Houthi missile and 5 drones",
-     (110, 186, 255)),
+     (110, 187, 255)),
     ("ITALY FINES META EUR 805M",
      "Regulator: Android photo access broke the rules",
-     (168, 232, 150)),
+     (170, 233, 150)),
     ("FAA GROUNDS US FLIGHTS",
      "Ground stop strands 1.5 million travellers",
-     (255, 170, 96)),
+     (255, 171, 97)),
     ("PRABOWO'S RP1,600T HAUL",
      "President back with near Rp1,600 trillion in pledges",
-     (255, 142, 196)),
+     (255, 143, 197)),
     ("KENYA BEATS EBOLA",
      "Last patient discharged, 37 days after first case",
-     (140, 224, 240)),
+     (140, 225, 241)),
+]
+
+TICKER = [
+    "IMF: GLOBAL DEBT NEARS 100% OF WORLD GDP",
+    "ESTONIA TO SHUT RUSSIAN BORDER FOR SIX MONTHS",
+    "GTA VI SALES TOP $2.3 BILLION",
+    "JAKARTA MINIMUM WAGE UP 7.1% TO RP6.1M",
 ]
 
 
-def load(size_path, size):
-    return ImageFont.truetype(size_path, size)
+def face(path, size):
+    return ImageFont.truetype(path, size)
 
 
-def shrink_to_fit(draw, text, path, start_size, limit):
-    """Biggest size at or under start_size that fits inside limit."""
-    size = start_size
-    while size > 10 and draw.textlength(text, font=load(path, size)) > limit:
+def fit_face(canvas, text, path, size, max_width):
+    """Shrink from `size` until `text` fits `max_width`."""
+    while size > 10:
+        f = face(path, size)
+        if canvas.textlength(text, font=f) <= max_width:
+            return f
         size -= 1
-    return load(path, size)
+    return face(path, size)
 
 
-def wrap(draw, text, face, limit):
-    """Greedy word wrap, measured with real glyph widths."""
-    lines, current = [], ""
+def fold_lines(canvas, text, fnt, max_width):
+    """Split `text` into lines that fit `max_width`."""
+    out, line = [], ""
     for word in text.split():
-        trial = f"{current} {word}".strip()
-        if draw.textlength(trial, font=face) <= limit:
-            current = trial
-        elif current:
-            lines.append(current)
-            current = word
+        trial = (line + " " + word).strip()
+        if canvas.textlength(trial, font=fnt) <= max_width:
+            line = trial
+        elif line:
+            out.append(line)
+            line = word
         else:
-            current = word
-    if current:
-        lines.append(current)
-    return lines
+            line = word
+    if line:
+        out.append(line)
+    return out
 
 
-def draw_panel(pen, index, grid_top, cell_w, cell_h):
-    head, body, accent = PANELS[index]
-    row, col = divmod(index, 4)
-    left = col * cell_w
-    top = grid_top + row * cell_h
-    pen.rectangle([left + 10, top + 10, left + cell_w - 10, top + 16],
-                  fill=accent)
-    if col:
-        pen.line([left, top + 8, left, top + cell_h - 8], fill=DIVIDER)
-    if row:
-        pen.line([left + 8, top, left + cell_w - 8, top], fill=DIVIDER)
-    head_face = load(SANS_BOLD, 20)
-    body_face = load(SANS, 18)
-    y = top + 24
-    for line in wrap(pen, head, head_face, cell_w - 24)[:3]:
-        pen.text((left + 12, y), line, font=head_face, fill=PAPER_WHITE)
+def story_cell(canvas, slot, grid_y, cw, ch):
+    title, standfirst, tab = STORIES[slot]
+    r, c = divmod(slot, 4)
+    x0 = c * cw
+    y0 = grid_y + r * ch
+    canvas.rectangle([x0 + 10, y0 + 10, x0 + cw - 10, y0 + 16], fill=tab)
+    if c > 0:
+        canvas.line([x0, y0 + 8, x0, y0 + ch - 8], fill=RULE)
+    if r > 0:
+        canvas.line([x0 + 8, y0, x0 + cw - 8, y0], fill=RULE)
+    title_f = face(SANS_B, 20)
+    body_f = face(SANS, 18)
+    y = y0 + 24
+    for ln in fold_lines(canvas, title, title_f, cw - 24)[:3]:
+        canvas.text((x0 + 12, y), ln, font=title_f, fill=WHITE)
         y += 24
-    for line in wrap(pen, body, body_face, cell_w - 24)[:3]:
-        pen.text((left + 12, y), line, font=body_face, fill=BODY_GREY)
+    for ln in fold_lines(canvas, standfirst, body_f, cw - 24)[:3]:
+        canvas.text((x0 + 12, y), ln, font=body_f, fill=MIST)
         y += 22
 
 
-def build():
-    page = Image.new("RGB", (SIDE, SIDE), PAPER)
+def compose():
+    page = Image.new("RGB", (W, W), CREAM)
     pen = ImageDraw.Draw(page)
 
-    # Nameplate and dateline.
-    pen.text((SIDE / 2, 10), "THE WORLD IN ONE DAY",
-             font=load(SERIF_BOLD, 60), fill=INK, anchor="ma")
-    pen.rectangle([30, 78, SIDE - 30, 82], fill=INK)
-    pen.rectangle([30, 85, SIDE - 30, 86], fill=INK)
-    pen.rectangle([0, 92, SIDE, 122], fill=INK)
-    pen.text((SIDE / 2, 107),
-             "FRIDAY  \u2022  20 NOVEMBER 2026  \u2022  WORLD NEWS IN ONE IMAGE",
-             font=load(SANS_BOLD, 20), fill=PAPER_WHITE, anchor="mm")
+    # Nameplate with its double rule, then the black dateline strip.
+    pen.text((W // 2, 10), "THE WORLD IN ONE DAY",
+             font=face(SERIF, 60), fill=BLACK, anchor="ma")
+    pen.rectangle([30, 78, W - 30, 82], fill=BLACK)
+    pen.rectangle([30, 85, W - 30, 86], fill=BLACK)
+    pen.rectangle([0, 92, W, 122], fill=BLACK)
+    pen.text((W // 2, 107), DATELINE,
+             font=face(SANS_B, 20), fill=WHITE, anchor="mm")
 
-    # Crash artwork, centred on the plunging chart line.
-    art_top, art_h = 122, 500
-    art = Image.open(MARKET_ART).convert("RGB")
-    art = ImageOps.fit(art, (SIDE, art_h), method=Image.LANCZOS,
-                       centering=(0.5, 0.42))
-    page.paste(art, (0, art_top))
+    # The artwork: 480 px tall, cropped a little high so the chart's
+    # final dive stays in frame.
+    art = Image.open(ARTWORK).convert("RGB")
+    art = ImageOps.fit(art, (W, 480), method=Image.LANCZOS,
+                       centering=(0.5, 0.40))
+    page.paste(art, (0, 122))
     pen = ImageDraw.Draw(page)
 
-    # Crimson headline band: the sell-off.
-    band_top = art_top + art_h
-    band_h = 100
-    pen.rectangle([0, band_top, SIDE, band_top + band_h], fill=BAND)
-    pen.text((SIDE / 2, band_top + 12), HEADLINE,
-             font=shrink_to_fit(pen, HEADLINE, SERIF_BOLD, 40, SIDE - 40),
-             fill=PAPER_WHITE, anchor="ma")
-    pen.text((SIDE / 2, band_top + 62), SUBHEAD,
-             font=load(SANS_BOLD, 25), fill=BAND_SUB, anchor="ma")
+    # Crimson lead band.
+    band_y = 122 + 480
+    pen.rectangle([0, band_y, W, band_y + 90], fill=CRIMSON)
+    pen.text((W // 2, band_y + 10), LEAD,
+             font=fit_face(pen, LEAD, SERIF, 40, W - 40),
+             fill=WHITE, anchor="ma")
+    pen.text((W // 2, band_y + 58), LEAD_SUB,
+             font=face(SANS_B, 24), fill=GOLD, anchor="ma")
 
-    # The eight other stories.
-    grid_top = band_top + band_h
-    pen.rectangle([0, grid_top, SIDE, SIDE], fill=GRID_BG)
-    cell_w = SIDE // 4
-    cell_h = (SIDE - grid_top) // 2
-    for index in range(len(PANELS)):
-        draw_panel(pen, index, grid_top, cell_w, cell_h)
+    # Eight stories in a 4x2 grid.
+    grid_y = band_y + 90
+    grid_h = 972 - grid_y
+    pen.rectangle([0, grid_y, W, 972], fill=GRID)
+    for slot in range(len(STORIES)):
+        story_cell(pen, slot, grid_y, W // 4, grid_h // 2)
 
-    page.save(OUT_PATH, format="PNG", optimize=True)
-    if os.path.getsize(OUT_PATH) > SIZE_CAP:
-        # Same pixels, JPEG at q88: stays crisp and lands under the cap.
-        page.save(OUT_PATH, format="JPEG", quality=88, optimize=True)
-    print(f"wrote {OUT_PATH}: {page.size}, {os.path.getsize(OUT_PATH)} bytes")
+    # Foot ticker: four more headlines on black, diamond-separated.
+    pen.rectangle([0, 972, W, W], fill=BLACK)
+    ticker_text = "  \u25c6  ".join(TICKER)
+    pen.text((W // 2, 998), ticker_text,
+             font=fit_face(pen, ticker_text, SANS_B, 19, W - 24),
+             fill=GOLD, anchor="mm")
+
+    page.save(TARGET, format="PNG", optimize=True)
+    if os.path.getsize(TARGET) > BYTE_LIMIT:
+        page.save(TARGET, format="JPEG", quality=88, optimize=True)
+    print("entry.png:", page.size, os.path.getsize(TARGET), "bytes")
 
 
 if __name__ == "__main__":
-    build()
+    compose()
